@@ -1,7 +1,10 @@
 from csv import reader
+import StringIO
 import numpy as np
 import re
 from nltk.tokenize import sent_tokenize, word_tokenize
+
+np.random.seed(1003)
 
 def process_raw_data():
     """
@@ -14,7 +17,7 @@ def process_raw_data():
     path = "../data/"
     raw_data_file = open(path + "elec_sub.csv", "rb")
     processed = open(path + "elec_sub_processed.csv", "w")
-    delimit = ", "
+    delimit = ","
 
     raw_data = reader(raw_data_file)
     header = next(raw_data) # skip header
@@ -32,6 +35,8 @@ def process_raw_data():
         for sentence in sentences:
             word_token += word_tokenize(sentence)
         row[2] = '"' + " ".join(word_token) + '"'
+        row[3] = '"' + row[3] + '"'
+        row[13] = '"' + row[13] + '"'
         row.append(str(len(sentences)))
         row.append(str(len(word_token)))
 
@@ -83,5 +88,63 @@ def findOccurencesOf(target, text):
     positions = [m.start() for m in re.finditer(target, text)]
     return positions
 
+def load_data(path):
+    f = open(path, "r")
+    data = []
+    line = f.readline() # skip header
+    line = f.readline()
+    noise = 0
+
+    while line:
+        row = next(reader(StringIO.StringIO(line)))
+
+        if len(row) != 28:
+            noise += 1
+        else:
+            data.append(line)
+
+        line = f.readline()
+
+    print noise, len(data)
+    return data
+
+def split_data():
+    """
+    split preprocessed data into training, validation and test set, 
+    with proportion 60%, 20%, 20%
+    """
+    print "spliting raw data into three sets ... "
+    path = "../data/"
+    data_path = path + "elec_sub_processed.csv"
+    data = load_data(data_path)
+
+    num_data = len(data)
+    num_train = int(num_data * 0.6)
+    num_valid = int(num_data * 0.2)
+
+    # shuffle the raw data
+    order = list(range(num_data))
+    np.random.shuffle(order)
+
+    # generate train data
+    train_data = open(path + "train.csv", "w")
+    for i in order[:num_train]:
+        train_data.write(data[i])
+    train_data.close()
+
+    # generate validation set
+    valid_data = open(path + "valid.csv", "w")
+    for i in order[num_train:num_train+num_valid]:
+        valid_data.write(data[i])
+    valid_data.close()
+
+    # generate validation set
+    test_data = open(path + "test.csv", "w")
+    for i in order[num_train+num_valid:]:
+        test_data.write(data[i])
+    test_data.close()
+
+
 if __name__ == "__main__":
     process_raw_data()
+    split_data()
