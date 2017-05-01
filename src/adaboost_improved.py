@@ -1,135 +1,69 @@
+from __future__ import print_function
 import numpy as np
-from csv import reader
 import model
-from sklearn.manifold import TSNE
-
-def feature_normalize(train, test):
-    """
-    Rescale the data so that each feature in the training set is in
-    the interval [0,1], and apply the same transformations to the test 
-    set, using the statistics computed on the training set.
-
-    Args: 
-        train - training set, a 2D numpy array of size (num_instances, num_features)
-        test  - test set, a 2D numpy array of size (num_instances, num_features)
-
-    Returns: 
-        train_normalized - training set after normalization 
-        test_normalized  - test set after normalization
-    """
-    # get max and min for each column
-    train_max = train.max(axis=0)
-    train_min = train.min(axis=0)
-
-    # discard column which has the constant value
-    indicator = (train_max != train_min)
-    train = train[:,indicator]
-    test = test[:,indicator]
-    train_max = train_max[indicator]
-    train_min = train_min[indicator]
-
-    # normalize
-    train_normalized = (train - train_min) / (train_max - train_min)
-    test_normalized = (test - train_min) / (train_max - train_min)
-
-    return train_normalized, test_normalized
-
-def load_data(path, tau=0.3):
-    """
-    load data and generate features and label from existing data attributes
-
-    NOTE:
-        This is for baseline. Currently, we choose 10 features.
-        Read code comments for more details
-
-    @param path: string, from which we read data
-    @param tau: float, threshold of labeling whether a product review is 
-                helpful or not, compared with the value of helpful/total.
-    @return feature: 2D numpy array (num_instances, num_features)
-    @return label: binary value
-    """
-    data_file = open(path, "rb")
-    data = reader(data_file, delimiter=",", quotechar='"')
-
-    feature = []
-    label = []
-
-    for row in data:
-        try:
-            attr = []
-            attr.append(float(row[6])) # score
-            attr.append(float(row[17])) # positive words
-            attr.append(float(row[18])) # negative words
-            attr.append(float(row[22])) # number of total user reviews
-            attr.append(1. * float(row[23]) / float(row[21])) # review sequence %
-            attr.append(float(row[24])) # score relative to average rating
-            attr.append(float(row[25])) # variance of rating
-
-            num_sent = float(row[26]) # number of sentences
-            attr.append(num_sent) 
-            num_word_token = float(row[27]) # number of word tokens
-            attr.append(num_word_token) 
-            if num_sent == 0:
-                attr.append(0)
-            else:
-                attr.append(1. * num_word_token / num_sent) # words per sentence
-            feature.append(np.array(attr))
-
-            # set label
-            helpful = float(row[8])
-            if helpful == 0:
-                label.append(0)
-            else:
-                ratio = 1. * helpful / float(row[9])
-                if ratio > tau:
-                    label.append(1)
-                else:
-                    label.append(0)
-        except ValueError:
-            print row
-
-    return np.array(feature), label
+import utils
+import pickle
+import os
 
 
-def tnse_reduction(data, n_components):
-    """
-    Manifold learning
+folder = "../data/pca/"
+model_path = "model/"
 
-    reference:
+if not os.path.exists(model_path):
+    os.mkdir(model_path)
 
-        http://scikit-learn.org/stable/modules/manifold.html
-
-    @param data: numpy array, (num_samples, num_features)
-    @param n_components: int, dimension of embedded space
-    @return tnsed_data: numpy array, (num_samples, num_features)
-    """
-    tsne = TSNE(n_components=n_components, random_state=0)
-    tsned_data = tsne.fit_transform(data)
-    return tsned_data
+X_train, y_train = utils.load_pca_csv_data(folder + "train.csv")
+X_valid, y_valid = utils.load_pca_csv_data(folder + "validate.csv")
+X_test, y_test = utils.load_pca_csv_data(folder + "test.csv")
 
 
-folder = "../data/raw/"
+def run_epoch(epoch):
+    m = model.AdaBoost(X_train, y_train, epoch)
+    m.train()
+
+    confusion_matrix_train = m.eval(X_train, y_train)
+    confusion_matrix_valid = m.eval(X_valid, y_valid)
+    confusion_matrix_test = m.eval(X_test, y_test)
+    
+    train_acc = utils.get_accuracy_from_confusion_matrix(confusion_matrix_train)
+    valid_acc = utils.get_accuracy_from_confusion_matrix(confusion_matrix_valid)
+    test_acc = utils.get_accuracy_from_confusion_matrix(confusion_matrix_test)
+
+    return train_acc, valid_acc, test_acc, m
 
 
 def run_ababoost_model():
-    n_components = 3
+    n_components = 2
+    begin = 301
+    end = begin + 100
+    epochs = list(range(begin, end))
 
-    X_train, y_train = load_data(folder + "train.csv")
-    print "Training data loaded.\nTraining ..."
-    X_train = tnse_reduction(X_train, n_components)
+    train_history = []
+    valid_history = []
+    test_history = []
+    best_model = None
+    best_valid_acc = 0
 
-    m = model.AdaBoost(X_train, y_train)
-    m.train()
+    for epoch in epochs:
+        train_acc, valid_acc, test_acc, model = run_epoch(epoch)
 
-    X_valid, y_valid = load_data(folder + "valid.csv")
-    X_valid = tnse_reduction(X_valid, n_components)
+        train_history.append(train_acc)
+        valid_history.append(valid_acc)
+        test_history.append(test_acc)
 
-    #X_test, y_test = load_data(folder + "test.csv")
-    #X_test = tnse_reduction(X_test, n_components)
+        if epoch > 1 and valid_acc > best_valid_acc:
+            best_model = model
+            best_valid_acc = valid_acc
 
-    acc = m.eval(X_valid, y_valid)
+    model_name = model_path + "adaboost_{}_{}.pkl"
+    pickle.dump(best_model, open(model_name.format(begin, end), "wb"))
 
-    print "Accuracy = %.6f" % acc
+    train_hist_name = model_path + "train_{}_{}.txt".format(begin, end)
+    np.savetxt(train_hist_name, train_history, delimiter=",", fmt="%1.6f")
+
+    valid_hist_name = model_path + "valid_{}_{}.txt".format(begin, end)
+    np.savetxt(valid_hist_name, valid_history, delimiter=",", fmt="%1.6f")
+
 
 if __name__ == "__main__":
     run_ababoost_model()

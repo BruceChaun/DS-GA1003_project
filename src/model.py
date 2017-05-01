@@ -1,6 +1,7 @@
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.tree import DecisionTreeClassifier
 import pickle
+import numpy as np
 
 
 class Model(object):
@@ -15,6 +16,7 @@ class Model(object):
         """
         self.X = X # training data, numpy type
         self.y = y # training label, numpy type
+        self.labels = np.unique(y)
 
     def train(self):
         """
@@ -77,14 +79,28 @@ class AdaBoost(Model):
         self.model.fit(self.X, self.y)
         
     def eval(self, X, y):
+        """
+        return a confusion matrix
+        """
         pred = self.model.predict(X)
         n = len(pred)
-        acc = 0
+        
+        TP = TN = FP = FN = 0
 
         for i in range(n):
-            if pred[i] == y[i]:
-                acc += 1
+            if y[i] == self.labels[1]:
+                if pred[i] == self.labels[1]:
+                    TP += 1
+                else:
+                    FN += 1
+            elif pred[i] == self.labels[0]:
+                if pred[i] == self.labels[0]:
+                    TN += 1
+                else:
+                    FP += 1
 
-        return 1. * acc / n
+        confusion_matrix = np.array([TP, FN, FP, TN]).reshape([2,2])
+
+        return confusion_matrix
 
 

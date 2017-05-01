@@ -1,6 +1,7 @@
+from __future__ import print_function
 import numpy as np
 from csv import reader
-import model
+from sklearn.manifold import TSNE
 
 def feature_normalize(train, test):
     """
@@ -33,7 +34,7 @@ def feature_normalize(train, test):
 
     return train_normalized, test_normalized
 
-def load_data(path, tau=0.3):
+def load_pca_csv_data(path, tau=0.5, skip_header=True):
     """
     load data and generate features and label from existing data attributes
 
@@ -44,67 +45,70 @@ def load_data(path, tau=0.3):
     @param path: string, from which we read data
     @param tau: float, threshold of labeling whether a product review is 
                 helpful or not, compared with the value of helpful/total.
+    @param skip_header: bool, True if you want to skip the header in the 
+                first row, False otherwise.
     @return feature: 2D numpy array (num_instances, num_features)
     @return label: binary value
     """
     data_file = open(path, "rb")
     data = reader(data_file, delimiter=",", quotechar='"')
 
+    if skip_header:
+        next(data)
+
     feature = []
     label = []
 
     for row in data:
         try:
-            attr = []
-            attr.append(float(row[6])) # score
-            attr.append(float(row[17])) # positive words
-            attr.append(float(row[18])) # negative words
-            attr.append(float(row[22])) # number of total user reviews
-            attr.append(1. * float(row[23]) / float(row[21])) # review sequence %
-            attr.append(float(row[24])) # score relative to average rating
-            attr.append(float(row[25])) # variance of rating
-
-            num_sent = float(row[26]) # number of sentences
-            attr.append(num_sent) 
-            num_word_token = float(row[27]) # number of word tokens
-            attr.append(num_word_token) 
-            if num_sent == 0:
-                attr.append(0)
-            else:
-                attr.append(1. * num_word_token / num_sent) # words per sentence
+            attr = row[-46:] # hard coded, last 46 cols are pca-ed data
+            for i in range(len(attr)):
+                attr[i] = float(attr[i])
             feature.append(np.array(attr))
 
             # set label
-            helpful = float(row[8])
+            helpful = float(row[2])
             if helpful == 0:
                 label.append(0)
             else:
-                ratio = 1. * helpful / float(row[9])
+                ratio = 1. * helpful / float(row[3])
                 if ratio > tau:
                     label.append(1)
                 else:
                     label.append(0)
         except ValueError:
-            print row
+            print(row)
 
-    return np.array(feature), label
-
-
-folder = "../data/raw/"
-
-X_train, y_train = load_data(folder + "train.csv")
-X_valid, y_valid = load_data(folder + "valid.csv")
-X_test, y_test = load_data(folder + "test.csv")
-
-X_train_norm, X_valid = feature_normalize(X_train, X_valid)
-_, X_test = feature_normalize(X_train, X_test)
+    return np.array(feature), np.array(label)
 
 
-def ababoost_model():
-    m = model.AdaBoost(X_train_norm, y_train)
-    m.train()
-    acc = m.eval(X_valid, y_valid)
-    print "Accuracy = %.6f" % acc
+def get_accuracy_from_confusion_matrix(confusion_matrix):
+    """
+    @param confusion_matrix: a numpy array, n*n
+    @return accuracy: float
+    """
+    accuracy = 0.0
+    _sum = np.sum(confusion_matrix)
+    for i in range(confusion_matrix.shape[0]):
+        accuracy += 1. * confusion_matrix[i,i] / _sum
 
-if __name__ == "__main__":
-    ababoost_model()
+    return accuracy
+
+
+def tnse_reduction(data, n_components):
+    """
+    Manifold learning
+
+    reference:
+
+        http://scikit-learn.org/stable/modules/manifold.html
+
+    @param data: numpy array, (num_samples, num_features)
+    @param n_components: int, dimension of embedded space
+    @return tnsed_data: numpy array, (num_samples, num_features)
+    """
+    tsne = TSNE(n_components=n_components, random_state=0)
+    tsned_data = tsne.fit_transform(data)
+    return tsned_data
+
+
