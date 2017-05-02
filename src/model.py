@@ -36,14 +36,6 @@ class Model(object):
         """
         raise NotImplementedError("eval() method in class Model must be overriden")
 
-    def model(self):
-        """
-        retrieve the trained model
-
-        Usage: trained_model = model.model()
-        """
-        return self.model
-
     def save(self, path):
         """
         save the trained model in disk
@@ -52,17 +44,18 @@ class Model(object):
 
         @param path: string, indicating the file to save the model
         """
-        pickle.dump(self.model(), open(path, "wb"))
+        pickle.dump(self.model, open(path, "wb"))
 
     def load(self, path):
         """
         load a saved model from disk
 
-        Usage: model.load("path/to/load")
+        Usage: trained_model = model.load("path/to/load")
 
         @param path: string, indicating the file to load the model
         """
         self.model = pickle.load(open(path, "rb"))
+        return self.model
 
 
 class AdaBoost(Model):

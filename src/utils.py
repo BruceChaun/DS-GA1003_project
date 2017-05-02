@@ -82,17 +82,22 @@ def load_pca_csv_data(path, tau=0.5, skip_header=True):
     return np.array(feature), np.array(label)
 
 
-def get_accuracy_from_confusion_matrix(confusion_matrix):
+def get_score_from_confusion_matrix(confusion_matrix):
     """
-    @param confusion_matrix: a numpy array, n*n
-    @return accuracy: float
+    @param confusion_matrix: a numpy array, 2*2
+    @return accuracy, f1_score
     """
-    accuracy = 0.0
     _sum = np.sum(confusion_matrix)
+
+    accuracy = 0.0
     for i in range(confusion_matrix.shape[0]):
         accuracy += 1. * confusion_matrix[i,i] / _sum
 
-    return accuracy
+    precision = 1. * confusion_matrix[0,0] / np.sum(confusion_matrix[:,0])
+    recall = 1. * confusion_matrix[0,0] / np.sum(confusion_matrix[0,:])
+    f1_score = 2. * precision * recall / (precision + recall)
+
+    return accuracy, f1_score
 
 
 def tnse_reduction(data, n_components):
