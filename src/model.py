@@ -71,7 +71,7 @@ class AdaBoost(Model):
                 algorithm="SAMME", n_estimators=self.T)
         self.model.fit(self.X, self.y)
         
-    def eval(self, X, y):
+    def eval(self, X, y, output=False):
         """
         return a confusion matrix
         """
@@ -86,13 +86,15 @@ class AdaBoost(Model):
                     TP += 1
                 else:
                     FN += 1
-            elif pred[i] == self.labels[0]:
+            elif y[i] == self.labels[0]:
                 if pred[i] == self.labels[0]:
                     TN += 1
                 else:
                     FP += 1
 
         confusion_matrix = np.array([TP, FN, FP, TN]).reshape([2,2])
+        if output:
+            return pred, confusion_matrix
 
         return confusion_matrix
 
