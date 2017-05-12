@@ -26,7 +26,7 @@ class Config(object):
     log_interval = 50
     save_path = "./saver/lstm_res" # path to save the model
     debug = False # debug mode?
-    L2 = 0.001 # L2 penalty in optimizer
+    L2 = 0 # L2 penalty in optimizer
 
 
 class Data(object):
@@ -85,8 +85,6 @@ else:
     model = rnn.RNNres(config.vocab_size, config.embed_size, config.hid_size, 
             config.lstm_drop, config.fc_drop)
 
-#criterion = nn.CrossEntropyLoss() #nn.MSELoss()
-
 lr = config.lr
 opt = optim.Adam(model.parameters(), weight_decay=config.L2)
 
@@ -105,7 +103,6 @@ def clip_gradient(model, clip):
         for p in model.parameters():
             if p.grad:
                 p.grad.data = p.grad.data / totalnorm * clip
-    #return min(1, clip / (totalnorm + 1e-6))
 
 
 def repackage_hidden(h):
@@ -118,17 +115,8 @@ def repackage_hidden(h):
 
 def acc(output, target):
     pred = output.data.max(1)[1] # get the index of the max log-probability
-    #print("predict | true label")
-    #print(pred.view(1, -1).numpy())
-    #print(target.data.view(1, -1).numpy())
     correct = pred.eq(target.data).cpu().sum()
     return 1. * correct / len(output)
-    """
-    #print(output, target)
-    m = (output * (2 * target - 1) > 0).float()
-    #print(m)
-    return 1. * torch.sum(m) / len(m)
-    """
 
 
 def evaluate(data_source):
@@ -143,7 +131,6 @@ def evaluate(data_source):
         target = Variable(torch.LongTensor(y))
         output, hidden = model(data, hidden, seq_len)
         total_loss += len(data) * F.nll_loss(output, target).data[0]
-        #criterion(output, target).data
         total_acc += len(data) * acc(output, target)
         hidden = repackage_hidden(hidden)
     return (total_loss / data_source.data_size, 
@@ -170,13 +157,7 @@ def train():
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         #torch.nn.utils.clip_grad_norm(model.parameters(), args.clip)
-        #clipped_lr = lr * clip_gradient(model, config.clip)
         clip_gradient(model, config.clip)
-
-        #for p in model.parameters():
-        #    if p.grad:
-        #        p.data.add_(-clipped_lr, p.grad.data)
-
         opt.step()
 
         total_loss += loss.data * len(data)

@@ -6,7 +6,6 @@ import string
 import re
 import operator
 import os
-#import tensorflow as tf
 import random
 
 random.seed(11111)
@@ -20,7 +19,6 @@ def spell_checker():
     raw_data = reader(raw_data_file)
     header = next(raw_data) # skip header
     spells = []
-    #outfile = open(path + "spell.csv", "w")
     i = 1
 
     for row in raw_data:
@@ -38,13 +36,11 @@ def spell_checker():
         if len(text) > 0:
             rate = 1. - acc * 1. / len(text)
             spells.append(rate)
-            #outfile.write(str(rate)+"\n")
         else:
             spells.append(-1)
-            #outfile.write("-1\n")
 
     pickle.dump(spells, open('spell.p', 'wb'))
-    #outfile.close()
+
 
 def split_sentences(sent_seq):
     """
@@ -69,6 +65,7 @@ def split_sentences(sent_seq):
     word_token = word_tokenize(sent_seq)
     return word_token
 
+
 def findOccurencesOf(target, text):
     """
     find all the occurences of the substring in text
@@ -80,6 +77,7 @@ def findOccurencesOf(target, text):
     target = "[" + target + "]"
     positions = [m.start() for m in re.finditer(target, text)]
     return positions
+
 
 def parse_numeric(string):
     """
@@ -108,6 +106,7 @@ def parse_numeric(string):
     if m:
         return True
     return False
+
 
 def read_words(filename, tau=0.5):
     """
@@ -144,14 +143,15 @@ def read_words(filename, tau=0.5):
 
         data.append([text, y])
 
-    #pickle.dump(texts, open(path+'texts.p', 'wb'))
     return data
+
 
 def get_vocab(filename="../data/vcb_20000.p"):
     """
     The vocabulary is a dict, whose key is word and value index
     """
     return pickle.load(open(filename, "rb"))
+
 
 def word_count():
     """
@@ -169,6 +169,7 @@ def word_count():
     print len(wc)
     wc = sorted(wc.items(), key=operator.itemgetter(1), reverse=True)
     pickle.dump(wc, open(path+"wc.p", "wb"))
+
 
 def top_frequent_tokens(n):
     """
@@ -191,7 +192,8 @@ def top_frequent_tokens(n):
     
     name = "vcb_%d.p" % n
     pickle.dump(vcb, open(path+name, "wb"))
-    #return vcb
+    return vcb
+
 
 def file_to_word_ids(filename, vocab):
     """
@@ -210,8 +212,8 @@ def file_to_word_ids(filename, vocab):
             else:
                 idx_words[i][0][j] = vocab[idx_words[i][0][j]]
 
-    #pickle.dump(idx_words, open(path+("texts_%d.p" % len(vocab)-1), "wb"))
     return idx_words
+
 
 def split_data(path="../data", filename="elec_sub.csv"):
     """
@@ -238,6 +240,7 @@ def split_data(path="../data", filename="elec_sub.csv"):
     with open(os.path.join(path, "test.csv"), "w") as f:
         f.write("\n".join(test_data))
 
+
 def padding(data, pad, max_len=None):
     """
     padding the data such that each sequence has the same length
@@ -252,6 +255,7 @@ def padding(data, pad, max_len=None):
         data[i] += [pad] * (max_len-len(data[i]))
 
     return data
+
 
 def get_raw_data(path):
     """
@@ -269,51 +273,11 @@ def get_raw_data(path):
 
     return train_data, valid_data, test_data, len(vcb)
 
+
 def load_raw_data(filename):
     data = pickle.load(open(filename, "rb"))
     return data
-    #return padding(data[:1000])
 
-def load_glove():
-    return pickle.load(open("../data/glove.6B.50d.p", "rb"))
-
-def load_glove_data(filename):
-    glove = load_glove()
-
-"""
-def producer(raw_data, batch_size, name=None):
-    with tf.name_scope(name, "Producer", [raw_data, batch_size]):
-        data_x = [raw_data[i][0] for i in range(len(raw_data))]
-        data_y = [raw_data[i][1] for i in range(len(raw_data))]
-        data_x = tf.convert_to_tensor(data_x, name="raw_data_x", dtype=tf.int32)
-        data_y = tf.convert_to_tensor(data_y, name="raw_data_y", dtype=tf.int32)
-
-        data_len = tf.size(data_x)
-        batch_len = data_len // batch_size
-        data = tf.reshape(data_x[0 : batch_size * batch_len],
-                [batch_size, batch_len])
-        label = tf.reshape(data_y[0:batch_size * batch_len],
-                [batch_size, batch_len])
-
-        return data, label
-
-        epoch_size = (batch_len - 1) // num_steps
-        assertion = tf.assert_positive(
-                epoch_size,
-                message="epoch_size == 0, decrease batch_size or num_steps") 
-        with tf.control_dependencies([assertion]):
-            epoch_size = tf.identity(epoch_size, name="epoch_size")
-
-        i = tf.train.range_input_producer(epoch_size, shuffle=False).dequeue()
-        x = tf.strided_slice(data, [0, i * num_steps],
-                [batch_size, (i + 1) * num_steps])
-        x.set_shape([batch_size, num_steps])
-        y = tf.strided_slice(label, [0, i * num_steps],
-                [batch_size, (i + 1) * num_steps])
-        y.set_shape([batch_size, num_steps])
-
-        return x, y
-"""
 
 def generate_data():
     n = 20000
@@ -323,6 +287,50 @@ def generate_data():
     pickle.dump(valid_data, open("../data/valid.p", "wb"))
     pickle.dump(test_data, open("../data/test.p", "wb"))
 
-#generate_data()
-#valid_data = load_raw_data("../data/valid.p")
-#x, y = producer(valid_data, 32)
+
+def truncate(filename):
+    vocab = get_vocab()
+    raw_data_file = open(filename, "rb")
+    out = open(filename+".trunc", "w")
+    raw_data = reader(raw_data_file)
+    tau = 0.7
+    data = []
+
+    for row in raw_data:
+        if len(row) == 0:
+            continue
+        text = row[3].strip() + " " + row[2].strip()
+        text = split_sentences(text)
+        if len(text) > 0 and len(text) < 500:
+            row[2] = '"' + row[2] + '"'
+            row[3] = '"' + row[3] + '"'
+            out.write(', '.join(row) + '\n')
+
+            try:
+                helpful = int(row[11])
+                total = int(row[12])
+            except:
+                continue
+            y = 1 if helpful > total * tau else 0
+
+            text = row[3].strip() + " " + row[2].strip()
+            text = split_sentences(text)
+
+            #filter all punctuations and replace numeric by <CD> -- numeric token
+            text = filter(lambda w: w not in string.punctuation, text)
+            text = ["<CD>" if parse_numeric(token) else token.lower() for token in text]
+
+            data.append([text, y])
+
+    idx_words = data
+    for i in range(len(idx_words)):
+        for j in range(len(idx_words[i][0])):
+            if idx_words[i][0][j] not in vocab:
+                idx_words[i][0][j] = vocab["<UNK>"]
+            else:
+                idx_words[i][0][j] = vocab[idx_words[i][0][j]]
+    
+    print(len(idx_words))
+    pickle.dump(idx_words, open("../data/test500.p", "wb"))
+
+
